@@ -2,8 +2,7 @@
 # 7 videos total (6 train, 1 test), frames are ezgif-frame-XXX.jpg
 
 dataset_params:
-  # !!! IMPORTANT: Replace with the ACTUAL FULL PATH to your dataset root directory !!!
-  root_dir: "path/to/your/my_shoe_data_for_fom"
+  root_dir: "dataset"
   frame_shape: [512, 512, 3] # Your frames are 512x512 RGB
   id_sampling: False # Each folder in train/test is a distinct video sequence
   # pairs_list: null # Not typically used for training, pairs are sampled from same video.
