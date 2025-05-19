@@ -1,0 +1,104 @@
+# Config for fine-tuning First Order Model on custom shoe videos (512x512)
+# 7 videos total (6 train, 1 test), frames are ezgif-frame-XXX.jpg
+
+dataset_params:
+  # !!! IMPORTANT: Replace with the ACTUAL FULL PATH to your dataset root directory !!!
+  root_dir: "path/to/your/my_shoe_data_for_fom"
+  frame_shape: [512, 512, 3] # Your frames are 512x512 RGB
+  id_sampling: False # Each folder in train/test is a distinct video sequence
+  # pairs_list: null # Not typically used for training, pairs are sampled from same video.
+  augmentation_params:
+    flip_param:
+      horizontal_flip: True
+      time_flip: True # Can be useful for more diverse motion
+    jitter_param: # Modest color augmentation
+      brightness: 0.1
+      contrast: 0.1
+      saturation: 0.1
+      hue: 0.1
+
+model_params: # These should ideally match the pre-trained model you are fine-tuning
+              # (e.g., vox-cpk or taichi-cpk).
+              # The architecture is kept same as 256px configs for initial fine-tuning.
+  common_params:
+    num_kp: 10
+    num_channels: 3
+    estimate_jacobian: True # Essential for First Order Model
+  kp_detector_params:
+     temperature: 0.1
+     block_expansion: 32
+     max_features: 1024
+     scale_factor: 0.25 # Internal KP map will be 128x128 for 512px input
+     num_blocks: 5
+  generator_params:
+    block_expansion: 64
+    max_features: 512
+    num_down_blocks: 2 # Standard for many pre-trained models
+    num_bottleneck_blocks: 6
+    estimate_occlusion_map: True
+    dense_motion_params:
+      block_expansion: 64
+      max_features: 1024
+      num_blocks: 5
+      scale_factor: 0.25 # Internal dense motion map will be 128x128
+  discriminator_params:
+    scales: [1]
+    block_expansion: 32
+    max_features: 512
+    num_blocks: 4
+    # sn: True # Add this if your pre-trained model (e.g., vox-cpk) used Spectral Normalization.
+               # Check the original config of your pre-trained model.
+    # use_kp: False # Add if pre-trained model used it (some variants do).
+
+train_params:
+  # Fine-tuning parameters for a very small dataset (7 videos) at 512x512
+  num_epochs: 50       # Start with a small number of epochs for fine-tuning
+  num_repeats: 20      # Increase effective dataset size per epoch for small datasets.
+                       # Total iterations over data = num_epochs * num_repeats
+  epoch_milestones: [30, 40] # Reduce Learning Rate at these epochs
+
+  # VERY IMPORTANT: Use a much smaller learning rate for fine-tuning
+  lr_generator: 1.0e-5
+  lr_discriminator: 1.0e-5
+  lr_kp_detector: 1.0e-5 # Or even 0 if you want to freeze kp_detector initially
+
+  # CRITICAL: Reduce batch_size due to 512x512 resolution and small dataset.
+  # Start with 1. Max is number of videos in your 'train' set (6 in your case).
+  # GPU VRAM will be the main constraint.
+  batch_size: 1
+  scales: [1, 0.5, 0.25, 0.125] # For perceptual loss pyramid
+
+  checkpoint_freq: 10 # Save checkpoints more frequently during fine-tuning
+
+  transform_params: # Standard settings for equivariance loss
+    sigma_affine: 0.05
+    sigma_tps: 0.005
+    points_tps: 5
+  loss_weights: # Check weights from the config of the pre-trained model if possible
+    # generator_gan: 0 # Set to 0 if pre-trained model did (e.g. taichi), or to focus on reconstruction.
+                       # Set to 1 if pre-trained model used it (e.g. vox-cpk). Defaulting to 0 for safety.
+    generator_gan: 0
+    discriminator_gan: 1
+    feature_matching: [10, 10, 10, 10]
+    perceptual: [10, 10, 10, 10, 10]
+    equivariance_value: 10
+    equivariance_jacobian: 10
+
+reconstruction_params:
+  # num_videos: 1 # Since you have 1 video in your test set.
+  # The script usually takes min(this_value, actual_num_test_videos)
+  num_videos: 10
+  format: '.mp4'
+
+animate_params:
+  num_pairs: 10 # How many animation pairs to generate for visualization during training
+  format: '.mp4'
+  normalization_params:
+    adapt_movement_scale: False
+    use_relative_movement: True
+    use_relative_jacobian: True
+
+visualizer_params:
+  kp_size: 5 # May need to increase this for 512x512 if keypoints look too small in visualizations (e.g., 7 or 10)
+  draw_border: True
+  colormap: 'gist_rainbow'
